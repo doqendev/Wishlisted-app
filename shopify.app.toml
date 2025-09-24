@@ -29,6 +29,6 @@ use_legacy_install_flow = false
 redirect_urls = [ ]
 
 [app_proxy]
-url = "https://fiber-lip-attended-london.trycloudflare.com/api/proxy"
+url = "https://monte-trustee-merit-crest.trycloudflare.com/api/proxy"
 subpath = "wishlisted"
 prefix = "apps"
