@@ -29,8 +29,12 @@
 
   function normalizeItems(json){
     if(!json) return [];
-    // Accept several shapes: {items:[...]}, [...]
-    const arr = Array.isArray(json) ? json : (Array.isArray(json.items) ? json.items : []);
+    // Accept several shapes: {list:{items:[...]}}, {items:[...]}, [...]
+    const arr = Array.isArray(json)
+      ? json
+      : (Array.isArray(json.items)
+          ? json.items
+          : (Array.isArray(json.list?.items) ? json.list.items : []));
     return arr.map((it)=>{
       // Try to normalize common fields
       const id = it.id || it.itemId || it.wishlistItemId || it.gid || it._id || null;
@@ -58,7 +62,8 @@
   async function load(){
     state.loading = true; state.error = null; render();
     // Try multiple endpoints for robustness
-    const endpoints = [`${BASE}/wishlist/items`, `${BASE}/wishlist`];
+    // Try the list endpoint first (it returns { list: { items: [...] } }) to avoid a 400 from /items (POST-only)
+    const endpoints = [`${BASE}/wishlist`, `${BASE}/wishlist/items`];
     for(const ep of endpoints){
       try{
         const json = await fetchJson(ep);
