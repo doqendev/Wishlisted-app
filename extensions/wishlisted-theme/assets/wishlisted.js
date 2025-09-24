@@ -1,6 +1,6 @@
 // Theme app extension bundle (re-exports public API)
 (()=>{
-  const BASE = '/apps/wishlisted/api/proxy';
+  const BASE = '/apps/wishlisted';
   async function addItem({ productGid, variantGid, wishlistId }){
     const r = await fetch(`${BASE}/wishlist/items`, {
       method: 'POST', headers: {'Content-Type':'application/json'},

@@ -1,5 +1,5 @@
 (function(){
-  const BASE = '/apps/wishlisted/api/proxy'; // App Proxy subpath prefix (configure in Partner Dashboard)
+  const BASE = '/apps/wishlisted'; // App Proxy subpath prefix (configure in Partner Dashboard)
 
   async function getWishlist() {
     const res = await fetch(`${BASE}/wishlist`, { credentials: 'include' });
