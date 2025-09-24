@@ -1,6 +1,6 @@
 (()=>{
   const ROOT_SEL = '[data-wl-root]';
-  const PROXY_BASE = '/apps/wishlisted';
+  const PROXY_BASE = '/apps/wishlisted/api/proxy';
 
   async function getWishlist(){
     const r = await fetch(`${PROXY_BASE}/wishlist`);
