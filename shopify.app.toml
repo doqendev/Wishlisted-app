@@ -27,3 +27,8 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [ ]
+
+[app_proxy]
+url = "https://fiber-lip-attended-london.trycloudflare.com/api/proxy"
+subpath = "wishlisted"
+prefix = "apps"

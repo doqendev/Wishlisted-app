@@ -1,88 +1,116 @@
 (()=>{
-  const ROOT_SEL = '[data-wl-root]';
-  const PROXY_BASE = '/apps/wishlisted';
+  const BASE = '/apps/wishlisted';
+  const root = document.querySelector('[data-wl-root]');
+  if(!root){ console.warn('[Wishlisted] root not found'); return; }
 
-  async function getWishlist(){
-    const r = await fetch(`${PROXY_BASE}/wishlist`);
-    if(!r.ok) throw new Error('wishlist fetch failed');
-    return r.json();
-  }
+  const state = { items: [], loading: true, error: null };
 
-  async function storefront(query, variables){
-    const r = await fetch(`${PROXY_BASE}/storefront`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ query, variables })
+  function el(tag, attrs = {}, children = []){
+    const node = document.createElement(tag);
+    Object.entries(attrs).forEach(([k,v])=>{
+      if(k === 'class') node.className = v;
+      else if(k === 'html') node.innerHTML = v;
+      else if(k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if(v !== undefined && v !== null) node.setAttribute(k, v);
     });
-    if(!r.ok) throw new Error('storefront fetch failed');
-    return r.json();
+    children.forEach(c=> node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
+    return node;
   }
 
-  async function removeItem(id){
-    const r = await fetch(`${PROXY_BASE}/wishlist/items/${encodeURIComponent(id)}`, { method:'POST' });
-    if(!r.ok) throw new Error('remove failed');
-    return r.json();
-  }
-
-  function money(m){
-    if(!m) return '';
-    try{ return new Intl.NumberFormat(undefined, { style:'currency', currency:m.currencyCode }).format(Number(m.amount)); }catch{ return `${m.amount} ${m.currencyCode}` }
-  }
-
-  function renderEmpty(root){
-    root.innerHTML = `<p class="wl-empty">Your wishlist is empty.</p>`;
-  }
-
-  function render(root, items, detailsById){
-    if(!items.length) return renderEmpty(root);
-    root.innerHTML = items.map(it=>{
-      const d = detailsById[it.variantGid];
-      if(!d) return '';
-      const img = d.product?.featuredImage;
-      const url = d.product?.handle ? `/products/${d.product.handle}?variant=${encodeURIComponent(d.id.split('/').pop())}` : '#';
-      return `<article class="wl-card">
-        <a href="${url}">${img?`<img src="${img.url}" alt="${img.altText||''}">`:'<div></div>'}</a>
-        <div>
-          <h3 class="wl-title"><a href="${url}">${d.product?.title||'Product'}</a></h3>
-          <div class="wl-price">${money(d.price)}</div>
-        </div>
-        <div>
-          <button data-wl-remove="${it.id}">Remove</button>
-        </div>
-      </article>`;
-    }).join('');
-    root.querySelectorAll('[data-wl-remove]').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
-        btn.disabled = true;
-        await removeItem(btn.getAttribute('data-wl-remove'));
-        btn.closest('.wl-card').remove();
-        if(!root.querySelector('.wl-card')) renderEmpty(root);
-      });
-    });
-  }
-
-  async function init(){
-    const root = document.querySelector(ROOT_SEL);
-    if(!root) return;
+  function priceToString(price){
+    if(price == null) return '';
     try{
-      const { list } = await getWishlist();
-      const ids = list.items.map(i=>i.variantGid);
-      if(ids.length === 0) return renderEmpty(root);
-      const query = `query($ids:[ID!]!){
-        nodes(ids:$ids){
-          ... on ProductVariant { id title price { amount currencyCode } product { title handle featuredImage { url altText } } }
-        }
-      }`;
-      const sf = await storefront(query, { ids });
-      const nodes = (sf.data && sf.data.nodes) || [];
-      const byId = {};
-      nodes.forEach(n=>{ if(n && n.id) byId[n.id] = n; });
-      render(root, list.items, byId);
-    } catch(e){
-      console.error('[Wishlisted] page init failed', e);
-      const root = document.querySelector(ROOT_SEL);
-      if(root) root.innerHTML = '<p class="wl-empty">There was a problem loading your wishlist.</p>'
+      if(typeof Shopify !== 'undefined' && Shopify.locale){
+        return new Intl.NumberFormat(Shopify.locale, { style: 'currency', currency: Shopify.currency?.active || 'USD' }).format(Number(price));
+      }
+    }catch(_){}
+    return `$${Number(price).toFixed(2)}`;
+  }
+
+  function normalizeItems(json){
+    if(!json) return [];
+    // Accept several shapes: {items:[...]}, [...]
+    const arr = Array.isArray(json) ? json : (Array.isArray(json.items) ? json.items : []);
+    return arr.map((it)=>{
+      // Try to normalize common fields
+      const id = it.id || it.itemId || it.wishlistItemId || it.gid || it._id || null;
+      const product = it.product || it.productData || it.node || it;
+      const variant = it.variant || it.variantData || it.selectedVariant || null;
+      const title = product?.title || it.title || 'Untitled product';
+      const handle = product?.handle || it.handle || null;
+      const url = product?.url || (handle ? `/products/${handle}` : '#');
+      const image = (product?.images?.[0]?.src) || (product?.featuredImage?.url) || it.image || it.imageUrl || variant?.image?.url || null;
+      const price = variant?.price || product?.price || product?.priceRange?.minVariantPrice?.amount || it.price || null;
+      return { id, title, url, image, price, raw: it };
+    });
+  }
+
+  async function fetchJson(url, opts){
+    const r = await fetch(url, opts);
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const ct = r.headers.get('content-type') || '';
+    if(ct.includes('application/json')) return r.json();
+    // allow liquid-rendered JSON in text
+    const text = await r.text();
+    try{ return JSON.parse(text); } catch(_){ return { html: text }; }
+  }
+
+  async function load(){
+    state.loading = true; state.error = null; render();
+    // Try multiple endpoints for robustness
+    const endpoints = [`${BASE}/wishlist/items`, `${BASE}/wishlist`];
+    for(const ep of endpoints){
+      try{
+        const json = await fetchJson(ep);
+        if(json?.html){ root.innerHTML = json.html; return; }
+        state.items = normalizeItems(json);
+        state.loading = false;
+        render();
+        return;
+      } catch(err){
+        console.warn('[Wishlisted] fetch failed for', ep, err);
+      }
+    }
+    state.loading = false; state.error = 'Could not load wishlist.'; render();
+  }
+
+  async function removeItem(item){
+    try{
+      const id = item.id || item.raw?.id;
+      const url = id ? `${BASE}/wishlist/items/${encodeURIComponent(id)}` : `${BASE}/wishlist/items`;
+      await fetch(url, { method: 'DELETE', headers: { 'Content-Type':'application/json' }, body: id ? null : JSON.stringify({ id }) });
+      state.items = state.items.filter(x=> x !== item);
+      render();
+    } catch(err){
+      console.error('[Wishlisted] remove failed', err);
+      alert('Sorry, failed to remove that item.');
     }
   }
 
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+  function render(){
+    root.innerHTML = '';
+    if(state.loading){
+      root.appendChild(el('div', { class: 'wl-empty' }, ['Loading your wishlist…']));
+      return;
+    }
+    if(state.error){
+      root.appendChild(el('div', { class: 'wl-empty' }, [state.error]));
+      return;
+    }
+    if(!state.items.length){
+      root.appendChild(el('div', { class: 'wl-empty' }, ['Your wishlist is empty.']));
+      return;
+    }
+    state.items.forEach((it)=>{
+      const img = it.image ? el('img', { src: it.image, alt: it.title }) : el('div', { class: 'wl-img-fallback' }, ['No image']);
+      const title = el('a', { href: it.url, class: 'wl-title' }, [it.title]);
+      const price = el('div', { class: 'wl-price' }, [priceToString(it.price)]);
+      const info = el('div', {}, [title, price]);
+      const removeBtn = el('button', { class: 'wl-remove', onClick: ()=> removeItem(it) }, ['Remove']);
+      const card = el('div', { class: 'wl-card' }, [img, info, removeBtn]);
+      root.appendChild(card);
+    });
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', load); else load();
 })();
