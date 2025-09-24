@@ -1,0 +1,17 @@
+{% comment %} Wishlisted: Full-width page section {% endcomment %}
+<section class="wishlisted-app-area">
+  <div id="wishlisted-page" data-wl-root data-shop="{{ shop.permanent_domain }}"></div>
+  <noscript>Please enable JavaScript to view your wishlist.</noscript>
+</section>
+
+{% schema %}
+{
+  "name": "Wishlisted: Page",
+  "settings": [
+    { "type": "text", "id": "title", "label": "Heading", "default": "My wishlist" }
+  ],
+  "javascript": "wishlisted-page.js",
+  "stylesheet": "wishlisted-page.css",
+  "enabled_on": { "templates": ["index", "page", "collection", "product"] }
+}
+{% endschema %}
