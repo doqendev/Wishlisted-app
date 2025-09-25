@@ -6,11 +6,17 @@ export async function action({ request }: ActionFunctionArgs) {
     return new Response("Unauthorized", { status: 401 });
   }
   const { query, variables } = await request.json();
-  const res = await fetch(`https://${process.env.STOREFRONT_PUBLIC_DOMAIN}/api/2025-07/graphql.json`, {
+  const domain = process.env.STOREFRONT_PUBLIC_DOMAIN || process.env.SHOP_DOMAIN;
+  const token = process.env.STOREFRONT_ACCESS_TOKEN || process.env.STOREFRONT_TOKEN;
+  const apiVersion = process.env.STOREFRONT_API_VERSION || '2025-07';
+  if(!domain || !token){
+    return new Response(JSON.stringify({ error: 'Storefront env not configured', domain, tokenSet: !!token }), { status: 500, headers: { 'Content-Type':'application/json' } });
+  }
+  const res = await fetch(`https://${domain}/api/${apiVersion}/graphql.json`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Shopify-Storefront-Access-Token": process.env.STOREFRONT_ACCESS_TOKEN!,
+      "X-Shopify-Storefront-Access-Token": token,
     },
     body: JSON.stringify({ query, variables }),
   });
