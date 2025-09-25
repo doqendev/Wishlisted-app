@@ -10,9 +10,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
   const { shop, customerId } = getProxyContext(request.url);
 
-  let user = await prisma.appUser.findFirst({ where: { shop, customerGid: customerId ?? undefined } });
+  let user = await prisma.appUser.findFirst({ where: { shop, customerGid: customerId ?? null } });
   if (!user) {
-    user = await prisma.appUser.create({ data: { shop, customerGid: customerId ?? undefined } });
+    user = await prisma.appUser.create({ data: { shop, customerGid: customerId ?? null } });
   }
 
   let list = await prisma.wishlist.findFirst({ where: { ownerId: user.id, shop }, include: { items: true } });

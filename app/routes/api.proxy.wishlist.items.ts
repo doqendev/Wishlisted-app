@@ -11,8 +11,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const { shop, customerId } = getProxyContext(request.url);
   const { productGid, variantGid, wishlistId } = await request.json();
 
-  let user = await prisma.appUser.findFirst({ where: { shop, customerGid: customerId ?? undefined } });
-  if (!user) user = await prisma.appUser.create({ data: { shop, customerGid: customerId ?? undefined } });
+  let user = await prisma.appUser.findFirst({ where: { shop, customerGid: customerId ?? null } });
+  if (!user) user = await prisma.appUser.create({ data: { shop, customerGid: customerId ?? null } });
 
   let list = wishlistId
     ? await prisma.wishlist.findUnique({ where: { id: wishlistId } })
