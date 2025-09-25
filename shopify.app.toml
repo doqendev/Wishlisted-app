@@ -29,6 +29,6 @@ use_legacy_install_flow = false
 redirect_urls = [ ]
 
 [app_proxy]
-url = "https://basically-original-subscribers-underwear.trycloudflare.com/api/proxy"
+url = "https://spectacular-adjustments-surgical-corn.trycloudflare.com/api/proxy"
 subpath = "wishlisted"
 prefix = "apps"
