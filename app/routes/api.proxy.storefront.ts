@@ -6,11 +6,11 @@ export async function action({ request }: ActionFunctionArgs) {
     return new Response("Unauthorized", { status: 401 });
   }
   const { query, variables } = await request.json();
-  const res = await fetch(`https://${process.env.SHOP_DOMAIN}/api/2025-07/graphql.json`, {
+  const res = await fetch(`https://${process.env.STOREFRONT_PUBLIC_DOMAIN}/api/2025-07/graphql.json`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Shopify-Storefront-Access-Token": process.env.STOREFRONT_TOKEN!,
+      "X-Shopify-Storefront-Access-Token": process.env.STOREFRONT_ACCESS_TOKEN!,
     },
     body: JSON.stringify({ query, variables }),
   });
